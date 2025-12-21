@@ -29,6 +29,22 @@ services:
       - "traefik.http.middlewares.lymphhub-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.middlewares.lymphhub-auth.forwardauth.authResponseHeaders=X-Auth-User,X-Auth-Email,X-Auth-Name"
 
+  lymphhub-frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_URL=https://${LYMPHHUB_PUBLIC_URL}
+    networks:
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
+      - "traefik.http.routers.lymphhub-web.rule=Host(`${LYMPHHUB_FRONTEND_URL}`)"
+      - "traefik.http.routers.lymphhub-web.entrypoints=websecure"
+      - "traefik.http.routers.lymphhub-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.lymphhub-web.loadbalancer.server.port=3000"
+
 networks:
   traefik-net:
     external: true
