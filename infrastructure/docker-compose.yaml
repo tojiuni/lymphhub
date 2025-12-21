@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # --- LymphHub Service ---
+  lymphhub-backend:
+    build:
+      context: ../backend
+    environment:
+      - KEYCLOAK_SERVER_URL=${KEYCLOAK_URL}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - LYMPHHUB_PUBLIC_URL=${LYMPHHUB_PUBLIC_URL}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+    networks:
+      - traefik-net
+      - neunexus_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
+      # Router Config
+      - "traefik.http.routers.lymphhub-api.rule=Host(`${LYMPHHUB_PUBLIC_URL}`)"
+      - "traefik.http.routers.lymphhub-api.entrypoints=websecure"
+      - "traefik.http.routers.lymphhub-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.lymphhub-api.loadbalancer.server.port=8000"
+
+      # --- DEFINE THE AUTH MIDDLEWARE HERE ---
+      - "traefik.http.middlewares.lymphhub-auth.forwardauth.address=http://lymphhub-backend:8000/api/auth"
+      - "traefik.http.middlewares.lymphhub-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.lymphhub-auth.forwardauth.authResponseHeaders=X-Auth-User,X-Auth-Email,X-Auth-Name"
+
+networks:
+  traefik-net:
+    external: true
+  neunexus_network:
+    external: true
