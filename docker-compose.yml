@@ -1,0 +1,75 @@
+# docker-compose.yml
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: data/caddy/Dockerfile.caddy
+    container_name: caddy
+    restart: unless-stopped
+    command: ["caddy", "run", "--config", "/etc/Caddyfile", "--adapter", "caddyfile"]
+    # Traefik이 80/443 사용 시 대체 포트 (호스트:컨테이너)
+    ports:
+      - "8080:80"     # HTTP (80 대신 8080)
+      - "8443:443"    # HTTPS (443 대신 8443)
+      - "8443:443/udp" # HTTP/3 (QUIC)
+      - "2019:2019"   # Dagger 연동을 위한 Admin API
+      - "3000:3000"
+      - "4000:4000"
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/Caddyfile:z
+      - ./data/caddy/public:/var/www/html:z
+      - ./data/.caddy:/root/.caddy:z
+    environment:
+      - CF_API_TOKEN=${CF_API_TOKEN}
+      - DOMAIN=${DOMAIN}
+      - EMAIL=${EMAIL}
+    networks:
+      - ${NETWORK}
+
+  authelia:
+    image: docker.io/authelia/authelia:latest
+    container_name: authelia
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:49091:9091"
+    volumes:
+      - ./config/authelia:/config:z
+      - ./data/authelia/secrets:/secrets:z
+    environment:
+      # DB 연결은 config/authelia/configuration.yml의 storage.postgres.address 사용.
+      # 비밀번호는 시크릿 파일만 사용 (env와 중복 지정 시 오류).
+      - AUTHELIA_STORAGE_POSTGRES_DATABASE=${DB_NAME}
+      - AUTHELIA_STORAGE_POSTGRES_USERNAME=${DB_USER}
+      - "AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE=/secrets/JWT_SECRET"
+      - "AUTHELIA_SESSION_SECRET_FILE=/secrets/SESSION_SECRET"
+      - "AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE=/secrets/STORAGE_PASSWORD"
+      - "AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE=/secrets/STORAGE_ENCRYPTION_KEY"
+    networks:
+      - ${NETWORK}
+
+  headscale:
+    image: docker.io/headscale/headscale:latest
+    container_name: headscale
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8080"   # API (호스트 8081 → 컨테이너 8080)
+      - "127.0.0.1:9095:9090"   # metrics
+    volumes:
+      - ./config/headscale:/etc/headscale:z
+      - ./data/headscale:/var/lib/headscale:z
+      - ./data/headscale/run:/var/run/headscale:z
+    command: serve
+    healthcheck:
+      test: ["CMD", "headscale", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ${NETWORK}
+
+networks:
+  neunexus_network:
+    external: true
+
+volumes:
+  caddy_data:

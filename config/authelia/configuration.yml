@@ -1,0 +1,61 @@
+# Authelia configuration (PostgreSQL storage)
+# Copy to configuration.yml and edit. Secrets (JWT, session, storage password, encryption key)
+# are read from files in data/authelia/secrets/ via environment variables.
+# https://www.authelia.com/configuration/prologue/introduction/
+
+server:
+  address: 'tcp://0.0.0.0:49091'
+
+log:
+  level: info
+
+totp:
+  issuer: 'authelia'
+
+# JWT secret: from file /secrets/JWT_SECRET (env AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE)
+identity_validation:
+  reset_password: {}
+
+authentication_backend:
+  file:
+    path: '/config/users_database.yml'
+
+access_control:
+  default_policy: 'deny'
+  rules:
+    - domain: 'public.toji.homes'
+      policy: 'bypass'
+    - domain: 'auth.toji.homes'
+      policy: 'one_factor'
+    - domain: 'secure.toji.homes'
+      policy: 'two_factor'
+
+# Session secret: from file /secrets/SESSION_SECRET (env AUTHELIA_SESSION_SECRET_FILE)
+session:
+  cookies:
+    - name: 'authelia_session'
+      domain: 'toji.homes'
+      authelia_url: 'https://auth.toji.homes'
+      expiration: '1 hour'
+      inactivity: '5 minutes'
+      default_redirection_url: 'https://public.toji.homes'
+
+regulation:
+  max_retries: 3
+  find_time: '2 minutes'
+  ban_time: '5 minutes'
+
+# storage.encryption_key: from file /secrets/STORAGE_ENCRYPTION_KEY
+# storage.postgres.password: from file /secrets/STORAGE_PASSWORD (env와 중복 지정 금지)
+storage:
+  postgres:
+    # DB 주소: 같은 네트워크(neunexus_network)의 PostgreSQL 컨테이너 이름으로 접속. 컨테이너 내부 포트 5432 사용.
+    # deploy_and_verify.sh 에서 이 주소로 TCP 접근 가능 여부를 검사함.
+    address: 'tcp://neunexus_postgres_db:5432'
+    database: 'lymphhub'
+    schema: 'public'
+    username: 'admin_Lymphhub'
+
+notifier:
+  filesystem:
+    filename: '/config/notification.txt'

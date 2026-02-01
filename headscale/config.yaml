@@ -1,0 +1,46 @@
+# Headscale 설정 (Tailscale v2 프로토콜 대응)
+# https://headscale.net/stable/ref/configuration/
+# server_url, base_domain 은 실제 도메인으로 수정 (Caddy 리버스프록시 사용 시 https 권장)
+
+# 클라이언트 접속 URL (.env 의 DOMAIN 사용, Caddy 리버스프록시 사용 시 https 권장)
+server_url: https://headscale.toji.homes
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9090
+grpc_listen_addr: 0.0.0.0:50443
+grpc_allow_insecure: true
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+
+dns:
+  magic_dns: true
+  base_domain: headscale.toji.homes
+  override_local_dns: true
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+
+policy:
+  mode: file
+  path: ""
+
+log:
+  level: info
+  format: text
+
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: "0770"

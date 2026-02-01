@@ -1,0 +1,14 @@
+DOMAIN=lyckabc.xyz
+SUBDOMAIN=lymphhub
+NETWORK=asd
+EMAIL=asd@gmail.com
+# Cloudflare 
+CF_API_TOKEN=asd
+
+#DB
+DB_HOST=
+DB_PORT=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
+DB_SSLMODE=disable

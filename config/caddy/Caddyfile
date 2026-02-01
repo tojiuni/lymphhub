@@ -1,0 +1,11 @@
+{
+    email {$EMAIL}
+    acme_dns cloudflare {$CF_API_TOKEN}
+}
+
+*.{$DOMAIN} {
+    tls {
+        dns cloudflare {$CF_API_TOKEN}
+    }
+    # 서비스 라우팅 로직...
+}
