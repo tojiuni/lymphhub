@@ -1,11 +1,61 @@
 {
     email {$EMAIL}
-    acme_dns cloudflare {$CF_API_TOKEN}
+    # Authelia Caddy 연동: trusted proxies (문서 권장 범위)
+    # https://www.authelia.com/integration/proxies/caddy/#trusted-proxies
+    # trusted_proxies 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
+    servers {
+        trusted_proxies static private_ranges
+    }
 }
 
+# ZeroSSL ACME (무료, 와일드카드 지원): https://zerossl.com/documentation/acme
+# EAB 발급: https://app.zerossl.com/developer → ACME EAB
+# auth.{$DOMAIN} = Authelia 포털만 (별도 블록으로 명시해 라우팅 확실히).
+# Get started: https://www.authelia.com/integration/prologue/get-started/
+auth.{$DOMAIN} {
+    tls {
+        issuer acme https://acme.zerossl.com/v2/DV90 {
+            eab {$ZEROSSL_EAB_KEY_ID:REPLACE_ME} {$ZEROSSL_EAB_HMAC_KEY:REPLACE_ME}
+            dns cloudflare {$CF_API_TOKEN}
+        }
+    }
+    # 루트(/) 접근 시 rd 없으면 리다이렉트 후 로그인 페이지 노출
+    @auth_root method GET path / not query rd
+    handle @auth_root {
+        redir /?rd=https://public.{$DOMAIN}/ 302
+    }
+    handle {
+        reverse_proxy authelia:9091 {
+            header_up X-Forwarded-Proto "https"
+            header_up X-Forwarded-Host {http.request.host}
+        }
+    }
+}
+
+# 그 외 *.{$DOMAIN}: Explicit Forward Auth (문서 Advanced example)
+# https://www.authelia.com/integration/proxies/caddy/#explicit-forward-auth
 *.{$DOMAIN} {
     tls {
-        dns cloudflare {$CF_API_TOKEN}
+        issuer acme https://acme.zerossl.com/v2/DV90 {
+            eab {$ZEROSSL_EAB_KEY_ID:REPLACE_ME} {$ZEROSSL_EAB_HMAC_KEY:REPLACE_ME}
+            dns cloudflare {$CF_API_TOKEN}
+        }
     }
-    # 서비스 라우팅 로직...
+    reverse_proxy authelia:9091 {
+        method GET
+        rewrite "/api/authz/forward-auth?authelia_url=https://auth.{$DOMAIN}/"
+        header_up X-Forwarded-Method {http.request.method}
+        header_up X-Forwarded-URI {http.request.uri}
+        header_up X-Forwarded-Proto {http.request.scheme}
+        header_up X-Forwarded-Host {http.request.host}
+        header_up X-Forwarded-For {http.request.remote}
+        @good status 2xx
+        handle_response @good {
+            request_header Remote-User {http.reverse_proxy.header.Remote-User}
+            request_header Remote-Groups {http.reverse_proxy.header.Remote-Groups}
+            request_header Remote-Email {http.reverse_proxy.header.Remote-Email}
+            request_header Remote-Name {http.reverse_proxy.header.Remote-Name}
+        }
+    }
+    respond "OK" 200
 }

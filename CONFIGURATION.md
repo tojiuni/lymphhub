@@ -112,7 +112,7 @@ You must configure Keycloak manually via the Admin Console (`https://auth.lyckab
 
 ## 5. Caddy Configuration (Reverse Proxy & Auth)
 LymphHub uses **Caddy** (not Traefik) for reverse proxy and auth management. Caddy 설정은 `data/caddy/` 및 관련 Dockerfile/볼륨을 참고한다.  
-Authelia는 `127.0.0.1:49091` (또는 compose에 정의된 포트)에서 동작하며, Caddy가 해당 백엔드로 프록시·인증을 처리한다.
+Authelia는 `192.168.0.88:9091` (또는 compose에 정의된 포트)에서 동작하며, Caddy가 해당 백엔드로 프록시·인증을 처리한다.
 
 **SSL 인증서 (`*.$DOMAIN`)**: Caddy가 **자동으로** 처리한다. `config/caddy/Caddyfile`의 `*.{$DOMAIN}` 블록과 `tls { dns cloudflare {$CF_API_TOKEN} }` 설정으로 Let's Encrypt(ACME) + Cloudflare DNS challenge를 사용해 와일드카드 인증서를 발급·갱신한다. 별도의 "Generating SSL certificate" 단계는 필요 없으며, `.env`에 `DOMAIN`, `EMAIL`, `CF_API_TOKEN`만 맞추면 된다. 인증서는 Caddy가 `./data/.caddy` 볼륨에 저장한다.
 
@@ -124,7 +124,7 @@ Headscale 설정은 `lymphhub/config/headscale/config.yaml` 에서 직접 수정
 
 - **볼륨**: `./config/headscale` → `/etc/headscale`, `./data/headscale` → `/var/lib/headscale`, `./data/headscale/run` → `/var/run/headscale`
 - **설정**: `server_url`, `base_domain` 을 실제 도메인으로 수정 (Caddy 리버스프록시 사용 시 `https://headscale.<도메인>`)
-- **동작 확인**: `curl http://127.0.0.1:9095/metrics` (호스트에서 metrics 포트 9095)
+- **동작 확인**: `curl http://192.168.0.88:9090/metrics` (호스트에서 metrics 포트 9090)
 
 **사용자 생성**:
 ```bash
@@ -164,8 +164,8 @@ cd lymphhub
 - **대기**: 모든 컨테이너가 `running` 될 때까지 대기 (기본 120초)
 - **헬스 체크**:
   - **Caddy**: HTTP 8080, Admin API 2019 응답 확인
-  - **Authelia**: 호스트 포트 49091 응답 확인
-  - **Headscale**: Docker healthcheck 또는 metrics 9095 응답 확인
+  - **Authelia**: 호스트 포트 9091 응답 확인
+  - **Headscale**: Docker healthcheck 또는 metrics 9090 응답 확인
 - **설정 검증**: Authelia `authelia validate-config` 실행
 - **Headscale 사용자**: 환경변수 `HEADSCALE_FIRST_USER` 가 있으면 해당 사용자 생성
 

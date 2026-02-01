@@ -1,0 +1,13 @@
+# Authelia users database (file backend)
+# Copy to users_database.yml and set your users.
+# https://www.authelia.com/configuration/first-factor/file/
+
+users:
+  john:
+    displayname: 'John Doe'
+    password: '$argon2id$v=19$m=65536,t=3,p=4$...'
+    email: john@example.com
+  jane:
+    displayname: 'Jane Doe'
+    password: '$argon2id$v=19$m=65536,t=3,p=4$...'
+    email: jane@example.com

@@ -1,4 +1,6 @@
 # docker-compose.yml
+# Traefik 등이 0.0.0.0:80/443 사용하므로, LymphHub는 192.168.0.88에만 바인드. 호스트에 192.168.0.88 할당 필요 (예: ip addr add 192.168.0.88/24 dev enp5s0).
+# 참고: macvlan(cicd_macvlan)에 붙이면 포트 발행(port publish)이 동작하지 않음 → bridge만 사용.
 services:
   caddy:
     build:
@@ -7,31 +9,34 @@ services:
     container_name: caddy
     restart: unless-stopped
     command: ["caddy", "run", "--config", "/etc/Caddyfile", "--adapter", "caddyfile"]
-    # Traefik이 80/443 사용 시 대체 포트 (호스트:컨테이너)
+    # 443에서 listen 해야 https://auth.toji.homes SSL 정상 (ZeroSSL 인증서).
     ports:
-      - "8080:80"     # HTTP (80 대신 8080)
-      - "8443:443"    # HTTPS (443 대신 8443)
-      - "8443:443/udp" # HTTP/3 (QUIC)
-      - "2019:2019"   # Dagger 연동을 위한 Admin API
-      - "3000:3000"
-      - "4000:4000"
+      - "192.168.0.88:80:80"       # HTTP
+      - "192.168.0.88:443:443"     # HTTPS
+      - "192.168.0.88:443:443/udp" # HTTP/3 (QUIC)
+      - "192.168.0.88:2019:2019"   # Dagger Admin API
+      - "192.168.0.88:3000:3000"
+      - "192.168.0.88:4000:4000"
     volumes:
       - ./config/caddy/Caddyfile:/etc/Caddyfile:z
       - ./data/caddy/public:/var/www/html:z
-      - ./data/.caddy:/root/.caddy:z
+      - ./data/caddy/.caddy:/root/.caddy:z
     environment:
       - CF_API_TOKEN=${CF_API_TOKEN}
+      - ZEROSSL_EAB_KEY_ID=${ZEROSSL_EAB_KEY_ID}
+      - ZEROSSL_EAB_HMAC_KEY=${ZEROSSL_EAB_HMAC_KEY}
       - DOMAIN=${DOMAIN}
       - EMAIL=${EMAIL}
     networks:
       - ${NETWORK}
+      - traefik-net
 
   authelia:
     image: docker.io/authelia/authelia:latest
     container_name: authelia
     restart: unless-stopped
     ports:
-      - "127.0.0.1:49091:9091"
+      - "192.168.0.88:9091:9091"
     volumes:
       - ./config/authelia:/config:z
       - ./data/authelia/secrets:/secrets:z
@@ -52,8 +57,8 @@ services:
     container_name: headscale
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8081:8080"   # API (호스트 8081 → 컨테이너 8080)
-      - "127.0.0.1:9095:9090"   # metrics
+      - "192.168.0.88:8080:8080"   # API
+      - "192.168.0.88:9095:9090"   # metrics
     volumes:
       - ./config/headscale:/etc/headscale:z
       - ./data/headscale:/var/lib/headscale:z
@@ -69,6 +74,8 @@ services:
 
 networks:
   neunexus_network:
+    external: true
+  traefik-net:
     external: true
 
 volumes:

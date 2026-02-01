@@ -13,10 +13,12 @@ cd "$SCRIPT_DIR"
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose}"
 WAIT_MAX=10          # max seconds to wait for containers
 HEALTH_POLL_INTERVAL=5
-AUTHELIA_HOST_PORT=49091   # host port for Authelia (container 9091)
-CADDY_HTTP_PORT=8080
-HEADSCALE_API_PORT=8081
-HEADSCALE_METRICS_PORT=9095
+BIND_HOST="${BIND_HOST:-192.168.0.88}"   # LymphHub listen IP (health checks); same-host 테스트 시 127.0.0.1 불가(192.168.0.88에만 바인드됨)
+AUTHELIA_HOST_PORT=9091   # host port for Authelia (container 9091)
+CADDY_HTTP_PORT=80
+HEADSCALE_API_PORT=8080
+HEADSCALE_METRICS_PORT=9090
+HEADSCALE_FIRST_USER="${HEADSCALE_FIRST_USER:-lyckabc}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -123,11 +125,11 @@ wait_for_containers() {
 # --- Service health checks ---
 check_caddy() {
   local ok=0
-  if curl -sf -o /dev/null --connect-timeout 3 "http://127.0.0.1:${CADDY_HTTP_PORT}" 2>/dev/null; then
+  if curl -sf -o /dev/null --connect-timeout 3 "http://${BIND_HOST}:${CADDY_HTTP_PORT}" 2>/dev/null; then
     log_info "Caddy: HTTP ${CADDY_HTTP_PORT} responding."
     ok=1
   fi
-  if curl -sf -o /dev/null --connect-timeout 3 "http://127.0.0.1:2019/config/" 2>/dev/null; then
+  if curl -sf -o /dev/null --connect-timeout 3 "http://${BIND_HOST}:2019/config/" 2>/dev/null; then
     log_info "Caddy: Admin API (2019) responding."
     ok=1
   fi
@@ -141,7 +143,7 @@ check_caddy() {
 
 check_authelia() {
   local code
-  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://127.0.0.1:${AUTHELIA_HOST_PORT}/" 2>/dev/null) || true
+  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://${BIND_HOST}:${AUTHELIA_HOST_PORT}/" 2>/dev/null) || true
   if [[ "$code" == "200" ]] || [[ "$code" == "302" ]] || [[ "$code" == "401" ]]; then
     log_info "Authelia: Port ${AUTHELIA_HOST_PORT} responding (HTTP ${code})."
     return 0
@@ -160,7 +162,7 @@ check_headscale() {
   fi
   if [[ "$health" == "" ]]; then
     # No healthcheck or old engine
-    if curl -sf -o /dev/null --connect-timeout 3 "http://127.0.0.1:${HEADSCALE_METRICS_PORT}/metrics" 2>/dev/null; then
+    if curl -sf -o /dev/null --connect-timeout 3 "http://${BIND_HOST}:${HEADSCALE_METRICS_PORT}/metrics" 2>/dev/null; then
       log_info "Headscale: Metrics port ${HEADSCALE_METRICS_PORT} responding."
       return 0
     fi
@@ -180,7 +182,7 @@ run_health_checks() {
 }
 
 # --- Authelia storage (PostgreSQL) connectivity: parse config and check TCP reachability ---
-# configuration.yml 에서 storage.postgres.address 만 사용 (server.address 인 0.0.0.0:49091 제외)
+# configuration.yml 에서 storage.postgres.address 만 사용 (server.address 인 0.0.0.0:9091 제외)
 check_authelia_storage_connectivity() {
   local authelia_config="$SCRIPT_DIR/config/authelia/configuration.yml"
   [[ -f "$authelia_config" ]] || return 0
@@ -279,7 +281,7 @@ main() {
   fi
   post_setup
   echo ""
-  log_info "Done. Services: Caddy (HTTP ${CADDY_HTTP_PORT}), Authelia (${AUTHELIA_HOST_PORT}), Headscale (API ${HEADSCALE_API_PORT}, metrics ${HEADSCALE_METRICS_PORT})."
+  log_info "Done. Services on ${BIND_HOST}: Caddy (HTTP ${CADDY_HTTP_PORT}), Authelia (${AUTHELIA_HOST_PORT}), Headscale (API ${HEADSCALE_API_PORT}, metrics ${HEADSCALE_METRICS_PORT})."
   exit 0
 }
 

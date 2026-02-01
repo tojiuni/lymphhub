@@ -1,0 +1,54 @@
+# Headscale 설정 (Tailscale v2 프로토콜 대응)
+# https://headscale.net/stable/ref/configuration/
+# server_url: 클라이언트가 접속하는 URL. base_domain: Magic DNS용 도메인 (서로 달라야 함)
+# server_url과 base_domain이 같으면 "DERP and headscale server unreachable" 오류 발생
+
+server_url: https://headscale.toji.homes
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9095
+grpc_listen_addr: 0.0.0.0:443
+grpc_allow_insecure: true
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+# DERP: 최소 1개 필요. Tailscale 기본 DERP 사용 (직접 릴레이 없이 동작)
+derp:
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+  auto_update_enabled: true
+  update_frequency: 3h
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+
+dns:
+  magic_dns: true
+  # base_domain은 server_url과 다른 서브도메인 사용 (기기 이름: mymachine.ts.lyckabc.xyz)
+  base_domain: ts.toji.homes
+  override_local_dns: true
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+
+policy:
+  mode: file
+  path: ""
+
+log:
+  level: info
+  format: text
+
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: "0770"
