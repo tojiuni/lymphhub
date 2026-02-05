@@ -1,0 +1,43 @@
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: neunexus
+    watch: true
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: lyckabc@gmail.com
+      storage: acme.json
+      httpChallenge:
+        entryPoint: web
+  cloudflare:
+      acme:
+        email: lyckabc@gmail.com
+        storage: acme.json
+        dnsChallenge:
+          provider: cloudflare
+          # DNS 전파를 기다리는 시간 (사설망 환경에선 넉넉히 잡는 것이 좋음)
+          delayBeforeCheck: 60
+
+log:
+  level: DEBUG

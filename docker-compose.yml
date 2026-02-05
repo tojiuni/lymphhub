@@ -1,42 +1,59 @@
 services:
-  caddy:
-    build:
-      context: .
-      dockerfile: data/caddy/Dockerfile.caddy
-    container_name: caddy
+  traefik:
+    image: traefik:latest
+    container_name: traefik
     restart: unless-stopped
-    command: ["caddy", "run", "--config", "/etc/Caddyfile", "--adapter", "caddyfile"]
-    environment:
-      - CF_API_TOKEN=${CF_API_TOKEN}
-      - ZEROSSL_EAB_KEY_ID=${ZEROSSL_EAB_KEY_ID}
-      - ZEROSSL_EAB_HMAC_KEY=${ZEROSSL_EAB_HMAC_KEY}
-      - DOMAIN=${DOMAIN}
-      - EMAIL=${EMAIL}
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true" 
+      - "--log.level=DEBUG"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      - "80:80/udp"
+      - "8077:8080" # 대시보드용
     volumes:
-      - ./config/caddy/Caddyfile:/etc/Caddyfile:z
-      - ./data/caddy/public:/var/www/html:z
-      - ./data/caddy/.caddy:/root/.caddy:z
+      - /var/run/docker.sock:/var/run/docker.sock:z
+      - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:z
+      - ./config/traefik/acme.json:/acme.json:z
+      - ./config/traefik/dynamic:/etc/traefik/dynamic:z
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      - "DOCKER_API_VERSION=1.52"
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     networks:
-      neunexus:
-        ipv4_address: 192.168.0.88 # 요청하신 고정 IP
+      - neunexus
+      - traefik-net
 
   authelia:
-    image: docker.io/authelia/authelia:latest
+    image: authelia/authelia:latest
     container_name: authelia
     restart: unless-stopped
     volumes:
       - ./config/authelia:/config:z
       - ./data/authelia/secrets:/secrets:z
     environment:
-      - AUTHELIA_STORAGE_POSTGRES_DATABASE=${DB_NAME}
-      - AUTHELIA_STORAGE_POSTGRES_USERNAME=${DB_USER}
-      - AUTHELIA_STORAGE_POSTGRES_ADDRESS=tcp://postgres_db:5432
       - "AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE=/secrets/JWT_SECRET"
       - "AUTHELIA_SESSION_SECRET_FILE=/secrets/SESSION_SECRET"
       - "AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE=/secrets/STORAGE_PASSWORD"
       - "AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE=/secrets/STORAGE_ENCRYPTION_KEY"
+    expose:
+      - 9091
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`) || Host(`public.${DOMAIN}`) || Host(`secure.${DOMAIN}`)"
+      - "traefik.http.routers.authelia.entrypoints=websecure"
+      - "traefik.http.routers.authelia.tls.certresolver=cloudflare"
+      - "traefik.http.services.authelia.loadbalancer.server.port=9091"
+      - "traefik.docker.network=neunexus"
     networks:
       - neunexus # IP를 명시하지 않으면 자동 할당됩니다.
+      - traefik-net
 
   headscale:
     image: docker.io/headscale/headscale:latest
@@ -52,10 +69,20 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.headscale.rule=Host(`vpn.${DOMAIN}`)"
+      - "traefik.http.routers.headscale.entrypoints=websecure"
+      - "traefik.http.routers.headscale.tls.certresolver=cloudflare"
+      - "traefik.http.services.headscale.loadbalancer.server.port=8080"
+      - "traefik.docker.network=neunexus"
     networks:
       - neunexus # 자동 할당
+      - traefik-net
 
 networks:
   neunexus: # 네트워크 이름을 외부 생성된 이름과 일치시킵니다.
     external: true
     name: neunexus
+  traefik-net:
+    external: true
