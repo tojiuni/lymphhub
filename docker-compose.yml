@@ -1,6 +1,3 @@
-# docker-compose.yml
-# Traefik 등이 0.0.0.0:80/443 사용하므로, LymphHub는 192.168.0.88에만 바인드. 호스트에 192.168.0.88 할당 필요 (예: ip addr add 192.168.0.88/24 dev enp5s0).
-# 참고: macvlan(cicd_macvlan)에 붙이면 포트 발행(port publish)이 동작하지 않음 → bridge만 사용.
 services:
   caddy:
     build:
@@ -9,56 +6,42 @@ services:
     container_name: caddy
     restart: unless-stopped
     command: ["caddy", "run", "--config", "/etc/Caddyfile", "--adapter", "caddyfile"]
-    # 443에서 listen 해야 https://auth.toji.homes SSL 정상 (ZeroSSL 인증서).
-    ports:
-      - "192.168.0.88:80:80"       # HTTP
-      - "192.168.0.88:443:443"     # HTTPS
-      - "192.168.0.88:443:443/udp" # HTTP/3 (QUIC)
-      - "192.168.0.88:2019:2019"   # Dagger Admin API
-      - "192.168.0.88:3000:3000"
-      - "192.168.0.88:4000:4000"
-    volumes:
-      - ./config/caddy/Caddyfile:/etc/Caddyfile:z
-      - ./data/caddy/public:/var/www/html:z
-      - ./data/caddy/.caddy:/root/.caddy:z
     environment:
       - CF_API_TOKEN=${CF_API_TOKEN}
       - ZEROSSL_EAB_KEY_ID=${ZEROSSL_EAB_KEY_ID}
       - ZEROSSL_EAB_HMAC_KEY=${ZEROSSL_EAB_HMAC_KEY}
       - DOMAIN=${DOMAIN}
       - EMAIL=${EMAIL}
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/Caddyfile:z
+      - ./data/caddy/public:/var/www/html:z
+      - ./data/caddy/.caddy:/root/.caddy:z
     networks:
-      - ${NETWORK}
-      - traefik-net
+      neunexus:
+        ipv4_address: 192.168.0.88 # 요청하신 고정 IP
 
   authelia:
     image: docker.io/authelia/authelia:latest
     container_name: authelia
     restart: unless-stopped
-    ports:
-      - "192.168.0.88:9091:9091"
     volumes:
       - ./config/authelia:/config:z
       - ./data/authelia/secrets:/secrets:z
     environment:
-      # DB 연결은 config/authelia/configuration.yml의 storage.postgres.address 사용.
-      # 비밀번호는 시크릿 파일만 사용 (env와 중복 지정 시 오류).
       - AUTHELIA_STORAGE_POSTGRES_DATABASE=${DB_NAME}
       - AUTHELIA_STORAGE_POSTGRES_USERNAME=${DB_USER}
+      - AUTHELIA_STORAGE_POSTGRES_ADDRESS=tcp://postgres_db:5432
       - "AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE=/secrets/JWT_SECRET"
       - "AUTHELIA_SESSION_SECRET_FILE=/secrets/SESSION_SECRET"
       - "AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE=/secrets/STORAGE_PASSWORD"
       - "AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE=/secrets/STORAGE_ENCRYPTION_KEY"
     networks:
-      - ${NETWORK}
+      - neunexus # IP를 명시하지 않으면 자동 할당됩니다.
 
   headscale:
     image: docker.io/headscale/headscale:latest
     container_name: headscale
     restart: unless-stopped
-    ports:
-      - "192.168.0.88:8080:8080"   # API
-      - "192.168.0.88:9095:9090"   # metrics
     volumes:
       - ./config/headscale:/etc/headscale:z
       - ./data/headscale:/var/lib/headscale:z
@@ -70,13 +53,9 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - ${NETWORK}
+      - neunexus # 자동 할당
 
 networks:
-  neunexus_network:
+  neunexus: # 네트워크 이름을 외부 생성된 이름과 일치시킵니다.
     external: true
-  traefik-net:
-    external: true
-
-volumes:
-  caddy_data:
+    name: neunexus

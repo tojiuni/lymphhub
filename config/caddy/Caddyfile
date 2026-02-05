@@ -7,55 +7,70 @@
         trusted_proxies static private_ranges
     }
 }
-
-# ZeroSSL ACME (무료, 와일드카드 지원): https://zerossl.com/documentation/acme
-# EAB 발급: https://app.zerossl.com/developer → ACME EAB
-# auth.{$DOMAIN} = Authelia 포털만 (별도 블록으로 명시해 라우팅 확실히).
-# Get started: https://www.authelia.com/integration/prologue/get-started/
-auth.{$DOMAIN} {
+# --- 인증 로직 재사용을 위한 Snippet ---
+(auth_check) {
+    forward_auth authelia:9091 {
+        uri /api/authz/forward-auth?authelia_url=https://auth.{$DOMAIN}/
+        copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+    }
+}
+# --- TLS 설정 재사용을 위한 Snippet ---
+(zerossl_tls) {
     tls {
         issuer acme https://acme.zerossl.com/v2/DV90 {
-            eab {$ZEROSSL_EAB_KEY_ID:REPLACE_ME} {$ZEROSSL_EAB_HMAC_KEY:REPLACE_ME}
+            eab {$ZEROSSL_EAB_KEY_ID} {$ZEROSSL_EAB_HMAC_KEY}
             dns cloudflare {$CF_API_TOKEN}
-        }
-    }
-    # 루트(/) 접근 시 rd 없으면 리다이렉트 후 로그인 페이지 노출
-    @auth_root method GET path / not query rd
-    handle @auth_root {
-        redir /?rd=https://public.{$DOMAIN}/ 302
-    }
-    handle {
-        reverse_proxy authelia:9091 {
-            header_up X-Forwarded-Proto "https"
-            header_up X-Forwarded-Host {http.request.host}
         }
     }
 }
+# 1. Authelia 포털 (인증 제외)
+auth.{$DOMAIN} {
+    import zerossl_tls
+    
+    @auth_root method GET path / not query rd
+    handle @auth_root {
+        # 로그인 성공 후 돌아갈 기본 페이지 설정 (예: public.도메인)
+        redir /?rd=https://{$DOMAIN}/ 302
+    }
+    
+    handle {
+        reverse_proxy authelia:9091
+    }
+}
+# 2. DB 관리 서비스 (예: pgAdmin - 인증 예외 또는 별도 처리)
+# 만약 DB 툴은 인증 없이 내부망에서만 쓰고 싶다면 (auth_check)를 생략합니다.
+rdb.{$DOMAIN} {
+    import zerossl_tls
+    # import auth_check  <-- 인증을 걸고 싶다면 주석 해제
+    
+    reverse_proxy pgadmin:80
+}
 
-# 그 외 *.{$DOMAIN}: Explicit Forward Auth (문서 Advanced example)
-# https://www.authelia.com/integration/proxies/caddy/#explicit-forward-auth
+# 3. 그 외 모든 서브도메인 (기본적으로 인증 적용)
 *.{$DOMAIN} {
-    tls {
-        issuer acme https://acme.zerossl.com/v2/DV90 {
-            eab {$ZEROSSL_EAB_KEY_ID:REPLACE_ME} {$ZEROSSL_EAB_HMAC_KEY:REPLACE_ME}
-            dns cloudflare {$CF_API_TOKEN}
-        }
+    import zerossl_tls
+    import auth_check
+
+    # 인증 통과 후 실제 서비스로 연결하는 로직 필요
+    # 여기서는 예시로 각 서브도메인 이름과 같은 컨테이너로 보냅니다.
+    reverse_proxy {labels.0}:80
+}
+
+*.lyckabc.xyz {
+    import zerossl_tls
+    import auth_check
+
+    # 인증 통과 후 실제 서비스로 연결하는 로직 필요
+    # 여기서는 예시로 각 서브도메인 이름과 같은 컨테이너로 보냅니다.
+    # 1. 특정 하위 경로에서 발생하는 문제 방지 및 헤더 최적화
+    reverse_proxy {labels.0}:80 {
+        # 백엔드에 원래 요청된 Host(예: app.lyckabc.xyz)를 그대로 전달
+        header_up Host {host}
+        
+        # 실제 클라이언트 IP 전달 (인증 및 로그 분석용)
+        header_up X-Real-IP {remote_host}
+        
+        # 일부 앱에서 리다이렉트 시 HTTP/HTTPS 혼동 방지
+        header_up X-Forwarded-Proto {scheme}
     }
-    reverse_proxy authelia:9091 {
-        method GET
-        rewrite "/api/authz/forward-auth?authelia_url=https://auth.{$DOMAIN}/"
-        header_up X-Forwarded-Method {http.request.method}
-        header_up X-Forwarded-URI {http.request.uri}
-        header_up X-Forwarded-Proto {http.request.scheme}
-        header_up X-Forwarded-Host {http.request.host}
-        header_up X-Forwarded-For {http.request.remote}
-        @good status 2xx
-        handle_response @good {
-            request_header Remote-User {http.reverse_proxy.header.Remote-User}
-            request_header Remote-Groups {http.reverse_proxy.header.Remote-Groups}
-            request_header Remote-Email {http.reverse_proxy.header.Remote-Email}
-            request_header Remote-Name {http.reverse_proxy.header.Remote-Name}
-        }
-    }
-    respond "OK" 200
 }
