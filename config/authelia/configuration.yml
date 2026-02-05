@@ -31,9 +31,9 @@ access_control:
     - domain: 'public.toji.homes'
       policy: bypass
     - domain: 'auth.toji.homes'
-      policy: one_factor
-    - domain: 'secure.toji.homes'
-      policy: two_factor
+      policy: bypass
+    # - domain: 'secure.toji.homes'
+    #   policy: two_factor
 
 # Session secret: AUTHELIA_SESSION_SECRET_FILE=/secrets/SESSION_SECRET (do not set here)
 session:
