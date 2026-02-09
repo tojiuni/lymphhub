@@ -2,8 +2,12 @@ DOMAIN=lyckabc.xyz
 SUBDOMAIN=lymphhub
 NETWORK=asd
 EMAIL=asd@gmail.com
-# Cloudflare 
-CF_API_TOKEN=asd
+# Cloudflare (DNS challenge)
+CF_DNS_API_TOKEN=
+
+# ZeroSSL ACME EAB (무료 와일드카드): https://app.zerossl.com/developer → ACME EAB
+ZEROSSL_EAB_KEY_ID=
+ZEROSSL_EAB_HMAC_KEY=
 
 #DB
 DB_HOST=

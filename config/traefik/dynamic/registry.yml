@@ -1,0 +1,29 @@
+http:
+  routers:
+    registry:
+      rule: "Host(`registry.toji.homes`)"
+      entryPoints:
+        - websecure
+      service: registry
+      tls:
+        certResolver: cloudflare
+    registry-ui:
+      rule: "Host(`registry-ui.toji.homes`)"
+      entryPoints:
+        - websecure
+      service: registry-ui
+      tls:
+        certResolver: cloudflare
+
+# Registry service
+  services:
+    registry:
+      loadBalancer:
+        servers:
+          - url: "http://registry:5000"
+        passHostHeader: true
+    registry-ui:
+      loadBalancer:
+        servers:
+          - url: "http://registry-ui:80"
+        passHostHeader: true
