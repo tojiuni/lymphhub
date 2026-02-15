@@ -3,3 +3,6 @@ node_modules
 .env
 data/authelia/secrets/
 data/headscale/
+data/keycloak/
+data/keycloak/config/
+*.pyc
