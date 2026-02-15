@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/keycloak_sdk/__init__.py
+src/keycloak_sdk/client.py
+src/keycloak_sdk/config.py
+src/keycloak_sdk.egg-info/PKG-INFO
+src/keycloak_sdk.egg-info/SOURCES.txt
+src/keycloak_sdk.egg-info/dependency_links.txt
+src/keycloak_sdk.egg-info/requires.txt
+src/keycloak_sdk.egg-info/top_level.txt

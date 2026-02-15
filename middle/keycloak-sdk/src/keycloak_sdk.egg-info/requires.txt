@@ -1,0 +1,5 @@
+python-keycloak>=3.0
+
+[dev]
+pytest
+pytest-cov
