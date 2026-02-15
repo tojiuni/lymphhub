@@ -1,0 +1,60 @@
+# Keycloak SDK
+
+LymphHub용 Keycloak 관리 SDK. [python-keycloak](https://python-keycloak.readthedocs.io/) 기반.
+
+## 설치
+
+```bash
+pip install -e .
+# 또는
+pip install python-keycloak
+```
+
+## 사용 예
+
+```python
+from keycloak_sdk import KeycloakSDK, KeycloakConfig
+
+# 환경변수에서 로드
+config = KeycloakConfig.from_env()
+sdk = KeycloakSDK(config)
+
+# Realm 생성
+sdk.create_realm("toji", enabled=True)
+
+# OIDC 클라이언트 생성
+sdk.create_oidc_client(
+    realm_name="toji",
+    client_id="my-app",
+    redirect_uris=["https://my-app.example.com/callback"],
+    web_origins=["https://my-app.example.com"],
+)
+
+# Temporal UI용 클라이언트 (toji realm 전용)
+client_id, secret = sdk.create_temporal_oidc_client(
+    realm_name="toji",
+    callback_url="https://temporal.toji.homes/auth/sso/callback",
+)
+
+# 사용자 생성
+sdk.create_user("toji", "user@example.com", email="user@example.com", password="secret")
+```
+
+## 환경변수
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| KEYCLOAK_SERVER_URL | Keycloak 서버 URL | https://auth.lyckabc.xyz |
+| KEYCLOAK_ADMIN_USERNAME | Admin 사용자명 | - |
+| KEYCLOAK_ADMIN_PASSWORD | Admin 비밀번호 | - |
+| KEYCLOAK_ADMIN_REALM | Admin realm | master |
+
+## Temporal UI 설정
+
+Temporal UI에 Keycloak toji realm 인증 적용:
+
+```bash
+python scripts/setup_temporal_keycloak.py
+```
+
+출력된 Client Secret을 `cicd/temporal/.env`에 설정. 자세한 내용은 `lymphhub/docs/TEMPORAL_KEYCLOAK_SETUP.md` 참고.

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keycloak-sdk"
+version = "0.1.0"
+description = "Keycloak SDK wrapper for LymphHub - realm, client, user management"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "python-keycloak>=3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
