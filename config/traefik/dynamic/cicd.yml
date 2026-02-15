@@ -1,6 +1,9 @@
-# CI/CD 관련 서비스 라우팅 (Temporal UI 등)
-# Docker Compose의 temporal-ui 라벨을 파일 기반으로 이전.
-# DOMAIN 변수 사용 시 배포 전 envsubst 등으로 치환하거나, 실제 도메인으로 수정하세요.
+# CI/CD 관련 서비스 라우팅 (Temporal UI, Convoy, metaflow_manager)
+# Traefik dynamic config. neunexus 네트워크 사용.
+# convoy-web:5005 (API/UI), 5007 (ingest), convoy-agent (내부 전용)
+#
+# Temporal UI: Keycloak OIDC (toji realm) - cicd/temporal docker-compose에서
+# TEMPORAL_AUTH_* 설정. lymphhub/docs/TEMPORAL_KEYCLOAK_SETUP.md 참고.
 
 http:
   routers:
@@ -12,9 +15,55 @@ http:
       tls:
         certResolver: cloudflare
 
+    # GitHub → Convoy ingest (POST /ingest/{source_uid})
+    convoy-ingest:
+      rule: "Host(`convoy.toji.homes`) && PathPrefix(`/ingest`)"
+      entryPoints:
+        - websecure
+      service: convoy-ingest
+      tls:
+        certResolver: cloudflare
+      priority: 10
+
+    # Convoy 대시보드/API
+    convoy-ui:
+      rule: "Host(`convoy.toji.homes`)"
+      entryPoints:
+        - websecure
+      service: convoy-web
+      tls:
+        certResolver: cloudflare
+
+    # Convoy → metaflow_manager (Convoy endpoint 전달, WebhookAdapter 처리)
+    cicd-trigger:
+      rule: "Host(`cicd.toji.homes`) && PathPrefix(`/webhooks`)"
+      entryPoints:
+        - websecure
+      service: metaflow_manager
+      tls:
+        certResolver: cloudflare
+
   services:
     temporal-ui:
       loadBalancer:
         servers:
           - url: "http://temporal-ui:8080"
+        passHostHeader: true
+
+    convoy-web:
+      loadBalancer:
+        servers:
+          - url: "http://convoy-web:5005"
+        passHostHeader: true
+
+    convoy-ingest:
+      loadBalancer:
+        servers:
+          - url: "http://convoy-web:5007"
+        passHostHeader: true
+
+    cicd-trigger:
+      loadBalancer:
+        servers:
+          - url: "http://metaflow_manager:8080"
         passHostHeader: true
